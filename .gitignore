@@ -32,7 +32,6 @@
 *.app
 
 # custom to this project
-build/
-*.xcodeproj
-*.plist
-*.nib
+XcodeGen/
+Notes.txt
+notes.txt

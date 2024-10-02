@@ -6,12 +6,12 @@
               pluginFormats="buildAAX,buildAU,buildVST3" pluginManufacturerCode="Lbdx"
               pluginCode="Fadm" pluginChannelConfigs="{2,2}" pluginAUMainType="'aufx'"
               pluginVST3Category="Fx,Tools" pluginAAXCategory="0,8192" lv2Uri="https://github.com/Louis-Deng/FreqAnalyzer"
-              headerPath="../**">
+              headerPath="../**;&#10;/**;">
   <MAINGROUP id="NnVpUT" name="FreqAnalyzerInDualMixer">
     <GROUP id="{9156BEAB-4F69-511C-214B-35AAA160F606}" name="LD_GUI">
-      <FILE id="E4GhQS" name="DWmixer.h" compile="0" resource="0" file="LD_GUI/DWmixer.h"/>
-      <FILE id="uHIGVw" name="FreqAnalyzer.h" compile="0" resource="0" file="LD_GUI/FreqAnalyzer.h"/>
-      <FILE id="HixDXt" name="SpectrumUtil.h" compile="0" resource="0" file="LD_GUI/SpectrumUtil.h"/>
+      <FILE id="ItalEK" name="DWmixer.h" compile="0" resource="0" file="Source/LD_GUI/DWmixer.h"/>
+      <FILE id="OF4900" name="FreqAnalyzer.h" compile="0" resource="0" file="Source/LD_GUI/FreqAnalyzer.h"/>
+      <FILE id="ZJ4nr9" name="SpectrumUtil.h" compile="0" resource="0" file="Source/LD_GUI/SpectrumUtil.h"/>
     </GROUP>
     <GROUP id="{F6834E14-06B1-6957-6970-98C3695E8A7C}" name="Source">
       <FILE id="H1CyUr" name="PluginProcessor.cpp" compile="1" resource="0"
@@ -43,7 +43,7 @@
   </MODULES>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"/>
   <EXPORTFORMATS>
-    <XCODE_MAC targetFolder="../">
+    <XCODE_MAC targetFolder="XcodeGen">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="FreqAnalyzerInDualMixer"
                        codeSigningIdentity="&quot;&quot;"/>

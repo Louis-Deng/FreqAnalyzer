@@ -16,9 +16,9 @@
 #include "SpectrumUtil.h"
 // all FFT-related objects in this header has fixed order: fftsize = 2048 (2e11)
 // fft :: 2^N sized fft -- 2^11 = 2048, ~23.4fps
-const uint32_t FFTORDER = 11;
+const uint32_t FFTORDER = 11;   // so far the FFTORDER is fixed at 11, may be subject to change later
 
-/// Sub-component of the freq-analyzer Component, fft-operation, data processing and lastly numerical normalization
+/// single data stream fft Unit (one signal channel)
 class fftUnit
 {
 public:
@@ -30,8 +30,10 @@ public:
         // make two buffers the size of fft buffersize
         iBuffer.resize(fftBufferSize);
         oBuffer.resize(fftBufferSize);
+        
         // nyquist size is half of total fftsize
-        iterNyquist = fftBufferSize>>1;
+        iterNyquist = fftBufferSize >> 1;
+        
         //DBG("fft buffer size is " + juce::String(fftBufferSize));
     }
     
@@ -61,7 +63,11 @@ public:
     
     std::vector<float> getBuffer() const { return oBuffer; }
     
-    int getIterB() const { return iterBuffer; }
+    /// get size of buffer
+    uint32_t getSizeBuffer() const { return fftBufferSize; }
+    
+    /// get size of useful info buffer (should be half of size of buffer)
+    uint32_t getSizeNyquist() const { return iterNyquist; }
     
 private:
     /// I/O Buffer
@@ -74,7 +80,8 @@ private:
     
     uint32_t fftBufferSize;
     std::unique_ptr<juce::dsp::FFT> fftOp;
-};
+    
+};  // fftUnit class brackets
 
 /// Channel component - includes dry and wet
 class FreqAnalChannel : public juce::Component
@@ -163,7 +170,7 @@ private:
         
     }
     
-};
+};  // FreqAnalChannel class brackets
 
 //#include <juce_FFT.h>
 /// Component Freq Analyzer, data organizing
@@ -198,7 +205,7 @@ private:
     // bin number max
     uint32_t iterBLimit = pow(2,FFTORDER-1);
     
-    /// leftright, drywet buffers
+    /// leftright, drywet buffers, initialize with identities
     FreqAnalChannel LFAC = FreqAnalChannel(0);
     FreqAnalChannel RFAC = FreqAnalChannel(1);
     
@@ -208,16 +215,6 @@ private:
         addChildComponent(RFAC,0);
         //repaint();
     }
-    /// common function call to all four buffer dupes
-    /*
-    void processAll4 (void (*f)(fftUnit b, uint32_t arg1), uint32_t arg1)
-    {
-        f(LD,arg1);
-        f(RD,arg1);
-        f(LW,arg1);
-        f(RW,arg1);
-    }
-    */
     
-};
+};  // FreqAnalyzer class brackets
 
