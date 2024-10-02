@@ -93,7 +93,7 @@ public:
         dryUnit.reset( new fftUnit );
         wetUnit.reset( new fftUnit );
         
-        iterBuffer = dryUnit->getIterB();
+        iterBuffer = dryUnit->getSizeBuffer();
         
         // should be 1/2 fftSize
         dryMags.resize(pow(2,iterBuffer));
