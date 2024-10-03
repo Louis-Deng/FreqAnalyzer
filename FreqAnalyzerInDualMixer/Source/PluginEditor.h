@@ -28,6 +28,9 @@ private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
     FreqAnalyzerInDualMixerAudioProcessor& audioProcessor;
+    
+    // custom added objects
+    std::shared_ptr<FreqAnalyzer> freqAnalyzerPtr;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (FreqAnalyzerInDualMixerAudioProcessorEditor)
 };

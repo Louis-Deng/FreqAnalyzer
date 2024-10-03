@@ -47,7 +47,7 @@
  #define JucePlugin_Desc                   "FreqAnalyzerInDualMixer"
 #endif
 #ifndef  JucePlugin_Manufacturer
- #define JucePlugin_Manufacturer           "Louis Deng"
+ #define JucePlugin_Manufacturer           "LouisDeng"
 #endif
 #ifndef  JucePlugin_ManufacturerWebsite
  #define JucePlugin_ManufacturerWebsite    "https://github.com/Louis-Deng/"
@@ -77,13 +77,13 @@
  #define JucePlugin_EditorRequiresKeyboardFocus  0
 #endif
 #ifndef  JucePlugin_Version
- #define JucePlugin_Version                0.0.1
+ #define JucePlugin_Version                0.0.2
 #endif
 #ifndef  JucePlugin_VersionCode
- #define JucePlugin_VersionCode            0x1
+ #define JucePlugin_VersionCode            0x2
 #endif
 #ifndef  JucePlugin_VersionString
- #define JucePlugin_VersionString          "0.0.1"
+ #define JucePlugin_VersionString          "0.0.2"
 #endif
 #ifndef  JucePlugin_VSTUniqueID
  #define JucePlugin_VSTUniqueID            JucePlugin_PluginCode
@@ -137,7 +137,7 @@
  #define JucePlugin_IAASubType             JucePlugin_PluginCode
 #endif
 #ifndef  JucePlugin_IAAName
- #define JucePlugin_IAAName                "Louis Deng: FreqAnalyzerInDualMixer"
+ #define JucePlugin_IAAName                "LouisDeng: FreqAnalyzerInDualMixer"
 #endif
 #ifndef  JucePlugin_VSTNumMidiInputs
  #define JucePlugin_VSTNumMidiInputs       16
@@ -167,5 +167,5 @@
  #define JucePlugin_MaxNumOutputChannels   2
 #endif
 #ifndef  JucePlugin_PreferredChannelConfigurations
- #define JucePlugin_PreferredChannelConfigurations  {2,2}
+ #define JucePlugin_PreferredChannelConfigurations  {1,1}, {2,2}
 #endif

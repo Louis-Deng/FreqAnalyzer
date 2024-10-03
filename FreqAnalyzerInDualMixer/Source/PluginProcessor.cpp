@@ -30,7 +30,7 @@ FreqAnalyzerInDualMixerAudioProcessor::FreqAnalyzerInDualMixerAudioProcessor()
     // initialzing all the unique_ptr_s
     for (int i=0;i<2;i++)
     {
-        DWM[i].reset( new DWmixer<float> );
+        mDWM[i].reset( new DWmixer<float> );
     }
 }
 
@@ -154,17 +154,38 @@ void FreqAnalyzerInDualMixerAudioProcessor::processBlock (juce::AudioBuffer<floa
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
-    // This is the place where you'd normally do the guts of your plugin's
-    // audio processing...
-    // Make sure to reset the state if your inner loop is processing
-    // the samples and the outer loop is handling the channels.
-    // Alternatively, you can process the samples with the channels
-    // interleaved by keeping the same state.
-    for (int channel = 0; channel < totalNumInputChannels; ++channel)
+    
+    // copy dry input all channels
+    juce::AudioBuffer<float> drySamples;
+    drySamples.makeCopyOf(buffer);
+    
+    // for each output channel
+    for (int channel = 0; channel < totalNumOutputChannels; channel++)
     {
-        auto* channelData = buffer.getWritePointer (channel);
-
-        // ..do something to the data...
+        int dryReadFromChan = 0;
+        if (totalNumInputChannels == 1 && totalNumOutputChannels == 1)
+        {
+            // mono -> mono
+            dryReadFromChan = 0;
+        }
+        else if (totalNumInputChannels == 1 && totalNumOutputChannels == 2)
+        {
+            // mono -> stereo
+            dryReadFromChan = 0;
+            // copy inL to inR in buffer
+            buffer.copyFrom(1, 0, buffer, 0, 0, buffer.getNumSamples());
+        }
+        else
+        {
+            // stereo -> stereo
+            dryReadFromChan = channel;
+        }
+        
+        auto* drySamplesPtr = drySamples.getReadPointer(dryReadFromChan);
+        auto* channelDSP = buffer.getWritePointer(channel);
+        
+        // dry wet mixer
+        mDWM[channel]->processBuffer(drySamplesPtr,channelDSP,buffer.getNumSamples());
     }
 }
 

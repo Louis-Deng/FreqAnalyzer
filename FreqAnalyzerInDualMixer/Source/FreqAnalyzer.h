@@ -26,15 +26,16 @@ public:
     {
         // initialize juce fft object
         fftOp.reset(new juce::dsp::FFT(FFTORDER));
-        fftBufferSize = (fftOp->getSize()) << 1;
+        sizeBuffer = (fftOp->getSize()) << 1;
         // make two buffers the size of fft buffersize
-        iBuffer.resize(fftBufferSize);
-        oBuffer.resize(fftBufferSize);
+        iBuffer.resize(sizeBuffer);
+        oBuffer.resize(sizeBuffer);
         
         // nyquist size is half of total fftsize
-        iterNyquist = fftBufferSize >> 1;
+        sizeNyquist = sizeBuffer >> 1;
         
-        //DBG("fft buffer size is " + juce::String(fftBufferSize));
+        DBG("fftUnit buffer size is " + juce::String(sizeBuffer));
+        DBG("fftUnit Nyquist size is " + juce::String(sizeNyquist));
     }
     
     ~fftUnit()
@@ -42,13 +43,12 @@ public:
     }
     
     /// inject a single sample to this fft unit, returns if this unit is ready to show its complete spectrum
-    bool injectSample (float input)
+    void injectSample (float input)
     {
         iBuffer[iterBuffer] = input;
         iterBuffer++;
-        bool ready = false;
         
-        if ( !(iterBuffer<iterNyquist) )
+        if ( !(iterBuffer<sizeNyquist) )
         {
             // reset buffer iterator
             iterBuffer = 0;
@@ -56,18 +56,28 @@ public:
             oBuffer = iBuffer;
             // calculate o
             fftOp->performFrequencyOnlyForwardTransform(&(oBuffer[0]));
-            ready = true;
+            if (!ready) ready = true;
+#ifdef DEBUG
+            else DBG("queue stalled for fftUnit D/W: " + juce::String(iddbgDW) + " L/R: " + juce::String(iddbgLR));
+#endif
         }
-        return ready;
     }
     
     std::vector<float> getBuffer() const { return oBuffer; }
     
     /// get size of buffer
-    uint32_t getSizeBuffer() const { return fftBufferSize; }
+    uint32_t getSizeBuffer() const { return sizeBuffer; }
     
     /// get size of useful info buffer (should be half of size of buffer)
-    uint32_t getSizeNyquist() const { return iterNyquist; }
+    uint32_t getSizeNyquist() const { return sizeNyquist; }
+    
+    bool ready = false;
+    
+    /// debug identity
+#ifdef DEBUG
+    int iddbgDW = -1;
+    int iddbgLR = -1;
+#endif
     
 private:
     /// I/O Buffer
@@ -75,10 +85,12 @@ private:
     std::vector<float> oBuffer;
     
     /// iteration related parameter
-    uint32_t iterNyquist;
     uint32_t iterBuffer = 0;
     
-    uint32_t fftBufferSize;
+    uint32_t sizeBuffer;
+    uint32_t sizeNyquist;
+    
+    /// base unit
     std::unique_ptr<juce::dsp::FFT> fftOp;
     
 };  // fftUnit class brackets
@@ -87,7 +99,7 @@ private:
 class FreqAnalChannel : public juce::Component
 {
 public:
-    FreqAnalChannel(uint32_t chan)
+    FreqAnalChannel(uint32_t chan): chanid(chan)
     {
         // init
         dryUnit.reset( new fftUnit );
@@ -96,8 +108,8 @@ public:
         iterBuffer = dryUnit->getSizeBuffer();
         
         // should be 1/2 fftSize
-        dryMags.resize(pow(2,iterBuffer));
-        wetMags.resize(pow(2,iterBuffer));
+        dBDry.resize(dryUnit->getSizeNyquist());
+        dBWet.resize(wetUnit->getSizeNyquist());
         
         // set bounds for graphics
         /*
@@ -112,6 +124,13 @@ public:
          */
         xPos = 15+(int)chan*315;
         
+#ifdef DEBUG
+        dryUnit->iddbgDW = 0;
+        wetUnit->iddbgDW = 1;
+        dryUnit->iddbgLR = (int)chan;
+        wetUnit->iddbgLR = (int)chan;
+#endif
+        
     }
     ~FreqAnalChannel()
     {
@@ -121,29 +140,33 @@ public:
     {
         switch(drywet){
             case 0:
-                dryReady = dryUnit->injectSample( inputSample );
+                dryUnit->injectSample( inputSample );
                 break;
             case 1:
-                wetReady = wetUnit->injectSample( inputSample );
+                wetUnit->injectSample( inputSample );
                 break;
         }
         
-        if (dryReady && wetReady)
+        if (dryUnit->ready && wetUnit->ready)
         {
-            graphGen();
+            spectrumGen();
+            const juce::MessageManagerLock mmLrepaint;
             repaint();
-            dryReady = false;
-            wetReady = false;
+            dryUnit->ready = false;
+            wetUnit->ready = false;
         }
     }
     
     /// inherited from juce::component
     void paint(juce::Graphics& g) override
     {
-        juce::Rectangle<int> rectArea (xPos, 295, 315, 270);
-        g.setColour(juce::Colours::white);
-        g.drawRect(rectArea);
+        DBG("mono channel paint called for channel: " + juce::String(chanid));
+        
     }
+    
+    /// Component bounds (0,0) (0,x) (0,y) (x,y)
+    //std::vector<std::vector<int>> bounds = std::vector<std::vector<int>>(4,std::vector<int>(2));
+    int xPos;
     
 private:
     // iterB
@@ -157,17 +180,19 @@ private:
     bool dryReady;
     bool wetReady;
     
-    // magnitude in dB graph
-    std::vector<float> dryMags;
-    std::vector<float> wetMags;
+    // SPL in dB lines
+    std::vector<float> dBDry;
+    std::vector<float> dBWet;
     
-    /// Component bounds (0,0) (0,x) (0,y) (x,y)
-    //std::vector<std::vector<int>> bounds = std::vector<std::vector<int>>(4,std::vector<int>(2));
-    int xPos;
+    // chan-id
+    uint32_t chanid;
     
-    void graphGen()
+    void spectrumGen()
     {
-        
+        dBDry = dryUnit->getBuffer();
+        SpectrumUtil::amp2db(dBDry);
+        dBWet = wetUnit->getBuffer();
+        SpectrumUtil::amp2db(dBWet);
     }
     
 };  // FreqAnalChannel class brackets
@@ -180,7 +205,10 @@ class FreqAnalyzer : public juce::Component
 public:
     FreqAnalyzer()
     {
-        init();
+        addChildComponent(LFAC,0);
+        addChildComponent(RFAC,0);
+        addAndMakeVisible(&LFAC);
+        addAndMakeVisible(&RFAC);
     }
     ~FreqAnalyzer()
     {
@@ -199,7 +227,16 @@ public:
         }
     }
         
-    
+    void paint(juce::Graphics& g) override
+    {
+        g.setColour(juce::Colours::white);
+        
+        juce::Rectangle<int> rectAreaL (LFAC.xPos, 295, 315, 270);
+        juce::Rectangle<int> rectAreaR (RFAC.xPos, 295, 315, 270);
+        
+        g.drawRect(rectAreaL);
+        g.drawRect(rectAreaR);
+    }
     
 private:
     // bin number max
@@ -208,13 +245,6 @@ private:
     /// leftright, drywet buffers, initialize with identities
     FreqAnalChannel LFAC = FreqAnalChannel(0);
     FreqAnalChannel RFAC = FreqAnalChannel(1);
-    
-    void init()
-    {
-        addChildComponent(LFAC,0);
-        addChildComponent(RFAC,0);
-        //repaint();
-    }
-    
+        
 };  // FreqAnalyzer class brackets
 

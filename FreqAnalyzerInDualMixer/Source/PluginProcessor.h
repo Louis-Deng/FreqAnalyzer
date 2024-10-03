@@ -63,7 +63,7 @@ private:
     /// vts parameters
     juce::AudioProcessorValueTreeState parameters;
     //==============================================================================
-    std::unique_ptr< DWmixer<float> > DWM[2];
+    std::unique_ptr< DWmixer<float> > mDWM[2];
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (FreqAnalyzerInDualMixerAudioProcessor)
 };

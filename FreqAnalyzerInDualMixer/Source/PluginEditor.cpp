@@ -15,7 +15,12 @@ FreqAnalyzerInDualMixerAudioProcessorEditor::FreqAnalyzerInDualMixerAudioProcess
 {
     // Make sure that before the constructor has finished, you've set the
     // editor's size to whatever you need it to be.
-    setSize (400, 300);
+    setSize (660, 580);
+    setResizable(false, false);
+    
+    freqAnalyzerPtr.reset( new FreqAnalyzer );
+    addAndMakeVisible(*freqAnalyzerPtr);
+    freqAnalyzerPtr->setBounds (15, 295, 630, 270);
 }
 
 FreqAnalyzerInDualMixerAudioProcessorEditor::~FreqAnalyzerInDualMixerAudioProcessorEditor()
@@ -28,9 +33,9 @@ void FreqAnalyzerInDualMixerAudioProcessorEditor::paint (juce::Graphics& g)
     // (Our component is opaque, so we must completely fill the background with a solid colour)
     g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
 
-    g.setColour (juce::Colours::white);
-    g.setFont (juce::FontOptions (15.0f));
-    g.drawFittedText ("Hello World!", getLocalBounds(), juce::Justification::centred, 1);
+    g.setColour (juce::Colours::grey);
+    g.setFont (juce::FontOptions (12.0f));
+    g.drawFittedText (+"FreqAnalyzer 0.0.1", getLocalBounds(), juce::Justification::topLeft, 1);
 }
 
 void FreqAnalyzerInDualMixerAudioProcessorEditor::resized()

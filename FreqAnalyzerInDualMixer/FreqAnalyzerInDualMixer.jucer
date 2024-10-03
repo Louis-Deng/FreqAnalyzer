@@ -2,11 +2,11 @@
 
 <JUCERPROJECT id="R1IZYK" name="FreqAnalyzerInDualMixer" projectType="audioplug"
               useAppConfig="0" addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1"
-              version="0.0.1" companyName="Louis Deng" companyWebsite="https://github.com/Louis-Deng/"
+              version="0.0.2" companyName="Louis Deng" companyWebsite="https://github.com/Louis-Deng/"
               pluginFormats="buildAAX,buildAU,buildVST3" pluginManufacturerCode="Lbdx"
-              pluginCode="Fadm" pluginChannelConfigs="{2,2}" pluginAUMainType="'aufx'"
+              pluginCode="Fadm" pluginChannelConfigs="{1,1}, {2,2}" pluginAUMainType="'aufx'"
               pluginVST3Category="Fx,Tools" pluginAAXCategory="0,8192" lv2Uri="https://github.com/Louis-Deng/FreqAnalyzer"
-              headerPath="/**;&#10;">
+              headerPath="/**;&#10;" pluginManufacturer="LouisDeng">
   <MAINGROUP id="NnVpUT" name="FreqAnalyzerInDualMixer">
     <GROUP id="{9156BEAB-4F69-511C-214B-35AAA160F606}" name="LD_GUI">
       <FILE id="dLNHRH" name="DWmixer.h" compile="0" resource="0" file="Source/DWmixer.h"/>
@@ -43,10 +43,11 @@
   </MODULES>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"/>
   <EXPORTFORMATS>
-    <XCODE_MAC targetFolder="XcodeGen">
+    <XCODE_MAC targetFolder="XcodeGen" xcodeValidArchs="arm64,arm64e,x86_64">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="FreqAnalyzerInDualMixer"
-                       codeSigningIdentity="&quot;&quot;" headerPath="/**&#10;"/>
+                       codeSigningIdentity="&quot;&quot;" headerPath="/**&#10;" macOSDeploymentTarget="14.6"
+                       osxCompatibility="14.6 SDK" osxArchitecture="Native"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="FreqAnalyzerInDualMixer"
                        codeSigningIdentity="&quot;&quot;" headerPath="/**&#10;"/>
       </CONFIGURATIONS>

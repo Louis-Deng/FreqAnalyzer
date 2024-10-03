@@ -39,8 +39,11 @@ public:
         for (int i=0;i<numSamps;i++)
         {
             //embed freq analyzer, inject dry and wet of this channel
-            faPtr->injectSampleToTo(*(dryBufferRead+i),thisChanid,0);
-            faPtr->injectSampleToTo(*(wetBufferWrite+i),thisChanid,1);
+            if (faPtr!=nullptr)
+            {
+                faPtr->injectSampleToTo(*(dryBufferRead+i),thisChanid,0);
+                faPtr->injectSampleToTo(*(wetBufferWrite+i),thisChanid,1);
+            }
             
             //overwrite wet with dry+wet
             *(wetBufferWrite+i) = mix(*(dryBufferRead+i),*(wetBufferWrite+i));
