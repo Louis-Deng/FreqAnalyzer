@@ -38,17 +38,11 @@ public:
     {
         for (int i=0;i<numSamps;i++)
         {
-            //embed freq analyzer, inject dry and wet of this channel
-            if (faPtr!=nullptr)
-            {
-                faPtr->injectSampleToTo(*(dryBufferRead+i),thisChanid,0);
-                faPtr->injectSampleToTo(*(wetBufferWrite+i),thisChanid,1);
-            }
-            
             //overwrite wet with dry+wet
             *(wetBufferWrite+i) = mix(*(dryBufferRead+i),*(wetBufferWrite+i));
         }
-    }    
+        //DBG("processed one buffer");
+    }
     
     void injectProportion(double input)
     {
@@ -73,7 +67,16 @@ private:
     
     SignalType mix(SignalType dryInput, SignalType wetInput)
     {
-        outSamp_ = ((double)1.0-proportion)*(double)dryInput+proportion*(double)wetInput;
+        SignalType dryPPT = (1.0-proportion)*(double)dryInput;
+        SignalType wetPPT = proportion*(double)wetInput;
+        //embed freq analyzer, inject dry and wet of this channel
+        if (faPtr!=nullptr)
+        {
+            faPtr->injectSampleToTo(dryPPT,thisChanid,0);
+            faPtr->injectSampleToTo(wetPPT,thisChanid,1);
+            //DBG("injectedToTo freqAnalyzer once");
+        }
+        outSamp_ = dryPPT+wetPPT;
         return outSamp_;
     }
 };

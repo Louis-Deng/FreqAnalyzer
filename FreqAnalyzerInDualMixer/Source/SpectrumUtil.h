@@ -13,7 +13,9 @@ namespace SpectrumUtil
 {
     inline float amp2db(float amp)
     {
-        float dbNegative = 20.0f*log10( pow(amp,2.0f) );
+        float dbNegative = 20.0f*log10( abs(amp) );
+        if (dbNegative < -1528.0f) {dbNegative = -1528.0f;}
+        
         return dbNegative;  // expected to return -inf when amp=0.0f
     }
 
@@ -21,7 +23,8 @@ namespace SpectrumUtil
     {
         for (int i=0;i<size(input);i++)
         {
-            input[i] = 20.0f*log10( pow(input[i],2.0f) );
+            if (abs(input[i]) < 1e-32) {input[i] = -1528.0f;}
+            else {input[i] = 20.0f*log10( abs(input[i]) );}
         }
     }
     

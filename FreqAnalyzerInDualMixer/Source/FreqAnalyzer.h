@@ -60,6 +60,7 @@ public:
 #ifdef DEBUG
             else DBG("queue stalled for fftUnit D/W: " + juce::String(iddbgDW) + " L/R: " + juce::String(iddbgLR));
 #endif
+            //DBG("injectSample hit top");
         }
     }
     
@@ -105,24 +106,14 @@ public:
         dryUnit.reset( new fftUnit );
         wetUnit.reset( new fftUnit );
         
-        iterBuffer = dryUnit->getSizeBuffer();
+        graphXSize = dryUnit->getSizeNyquist()>>1;
         
         // should be 1/2 fftSize
-        dBDry.resize(dryUnit->getSizeNyquist());
-        dBWet.resize(wetUnit->getSizeNyquist());
+        dBDry.resize(graphXSize);
+        dBWet.resize(graphXSize);
         
-        // set bounds for graphics
-        /*
-        int x0 = 15;
-        int y0 = 295;
-        int xi = 315;
-        int yi = 135;
-        for (int v=0; v<4; v++){
-            bounds[v][0] = chan*xi+x0+(v%2)*xi;
-            bounds[v][1] = y0+(v/2)*yi;
-        }
-         */
-        xPos = 15+(int)chan*315;
+        dryLines.resize(graphXSize-1);
+        wetLines.resize(graphXSize-1);
         
 #ifdef DEBUG
         dryUnit->iddbgDW = 0;
@@ -130,7 +121,7 @@ public:
         dryUnit->iddbgLR = (int)chan;
         wetUnit->iddbgLR = (int)chan;
 #endif
-        
+        recalculateIncrements();
     }
     ~FreqAnalChannel()
     {
@@ -152,25 +143,88 @@ public:
             spectrumGen();
             const juce::MessageManagerLock mmLrepaint;
             repaint();
+            //DBG("both ready for this channel " + juce::String(chanid) + " , repaint called");
             dryUnit->ready = false;
             wetUnit->ready = false;
         }
     }
     
+    void resized() override
+    {
+        recalculateIncrements();
+        DBG("FAC " + juce::String((float)getWidth()) + " " + juce::String((float)getHeight()));
+    }
+    
     /// inherited from juce::component
     void paint(juce::Graphics& g) override
     {
-        DBG("mono channel paint called for channel: " + juce::String(chanid));
+        const juce::MessageManagerLock mmLpaintnow;
+        //DBG("mono channel paint called for channel: " + juce::String(chanid));
+        
+        float xLast, xThis;
+        float dLast, wLast, dThis, wThis;
+        // void drawLine(float startX, float startY, float endX, float endY) const
+        // void drawLine(float startX, float startY, float endX, float endY, float lineThickness) const
+        for (int i=1;i<graphXSize-1;i++)
+        {//skip zero frequency and nyquist frequency
+            if (i==1)
+            {
+                xThis = 0.0f;
+                dThis = dBDry[i]*yIncrement;
+                wThis = dBWet[i]*yIncrement;
+            }else{
+                dLast = dThis;
+                wLast = wThis;
+                xLast = xThis;
+                
+                xThis = xLast+xIncrement;
+                dThis = dBDry[i]*yIncrement;
+                wThis = dBWet[i]*yIncrement;
+                
+                // undraw previous lines (?)
+                /*
+                g.setColour(juce::Colours::white);
+                g.drawLine(dryLines[i-1]);
+                g.drawLine(wetLines[i-1]);
+                */
+                
+                // set and draw new lines
+                dryLines[i-1].setStart(xLast,dLast);
+                dryLines[i-1].setEnd(xThis,dThis);
+                if (chanid == 0)
+                {
+                    g.setColour(juce::Colours::yellow);
+                    g.setOpacity(0.5);
+                }
+                else if (chanid == 1)
+                {
+                    g.setColour(juce::Colours::orange);
+                    g.setOpacity(0.5);
+                }
+                g.drawLine(dryLines[i-1]);
+                
+                wetLines[i-1].setStart(xLast,dLast);
+                wetLines[i-1].setEnd(xThis,wThis+dThis);
+                if (chanid == 0)
+                {
+                    g.setColour(juce::Colours::pink);
+                    g.setOpacity(0.5);
+                }
+                else if (chanid == 1)
+                {
+                    g.setColour(juce::Colours::purple);
+                    g.setOpacity(0.5);
+                }
+                g.drawLine(wetLines[i-1]);
+                
+            }
+        }
         
     }
     
-    /// Component bounds (0,0) (0,x) (0,y) (x,y)
-    //std::vector<std::vector<int>> bounds = std::vector<std::vector<int>>(4,std::vector<int>(2));
-    int xPos;
-    
 private:
     // iterB
-    int iterBuffer;
+    int graphXSize;
     
     // dry and wet fft units
     std::unique_ptr<fftUnit> dryUnit;
@@ -187,6 +241,14 @@ private:
     // chan-id
     uint32_t chanid;
     
+    // dimension related floats
+    float xIncrement;
+    float yIncrement;
+    
+    // lines
+    std::vector<juce::Line<float>> dryLines;
+    std::vector<juce::Line<float>> wetLines;
+    
     void spectrumGen()
     {
         dBDry = dryUnit->getBuffer();
@@ -195,20 +257,28 @@ private:
         SpectrumUtil::amp2db(dBWet);
     }
     
+    /// called when channel component initialized or resized
+    void recalculateIncrements()
+    {
+        xIncrement = (float)getWidth()/graphXSize;
+        yIncrement = (float)getHeight()/-192.0f;
+        DBG("FAC inc " + juce::String(xIncrement) + " " + juce::String(yIncrement));
+    }
+    
 };  // FreqAnalChannel class brackets
 
 //#include <juce_FFT.h>
-/// Component Freq Analyzer, data organizing
+/// Component Freq Analyzer, two channels, two graphs, each with both D/W
 class FreqAnalyzer : public juce::Component
 {
     
 public:
     FreqAnalyzer()
-    {
-        addChildComponent(LFAC,0);
-        addChildComponent(RFAC,0);
+    {        
         addAndMakeVisible(&LFAC);
         addAndMakeVisible(&RFAC);
+        LFAC.setOpaque(false);
+        RFAC.setOpaque(false);
     }
     ~FreqAnalyzer()
     {
@@ -226,25 +296,33 @@ public:
                 break;
         }
     }
+    
+    void resized() override
+    {
+        rectAreaL = juce::Rectangle<int>(0, 0, getWidth(), getHeight());
+        rectAreaR = juce::Rectangle<int>(0, 0, getWidth(), getHeight());
+        DBG("FA: " + juce::String(getWidth()) + " " + juce::String(getHeight()));
+        LFAC.setBounds(rectAreaL);
+        RFAC.setBounds(rectAreaR);
+    }
         
     void paint(juce::Graphics& g) override
     {
         g.setColour(juce::Colours::white);
-        
-        juce::Rectangle<int> rectAreaL (LFAC.xPos, 295, 315, 270);
-        juce::Rectangle<int> rectAreaR (RFAC.xPos, 295, 315, 270);
-        
         g.drawRect(rectAreaL);
         g.drawRect(rectAreaR);
+        
+        //can this not be called so often?? - unfortunately, child component calls repaint, this gets called
+        //DBG("freqAnalyzer borders painted");
     }
     
 private:
-    // bin number max
-    uint32_t iterBLimit = pow(2,FFTORDER-1);
-    
     /// leftright, drywet buffers, initialize with identities
     FreqAnalChannel LFAC = FreqAnalChannel(0);
     FreqAnalChannel RFAC = FreqAnalChannel(1);
-        
+    
+    juce::Rectangle<int> rectAreaL;
+    juce::Rectangle<int> rectAreaR;
+    
 };  // FreqAnalyzer class brackets
 

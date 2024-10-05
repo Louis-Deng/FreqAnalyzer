@@ -13,8 +13,15 @@
 FreqAnalyzerInDualMixerAudioProcessor::FreqAnalyzerInDualMixerAudioProcessor()
 : mBufferSize(0)
 , mSampleRate(0.0)
-, parameters (*this, nullptr, juce::Identifier ("PVT"),{
-    
+, vtsParameters (*this, nullptr, juce::Identifier ("PVT"),{
+    std::make_unique<juce::AudioParameterFloat>     (juce::ParameterID{"00-allmix",1},// {parameterID,parameterVersionHint>0: for AU}
+                                                             "Dry/Wet Mix",       // parameter name
+                                                             //min,max,increment,*skew
+                                                             juce::NormalisableRange(0.000f,1.000f,0.001f),
+                                                             1.000f,              // default value
+                                                             juce::AudioParameterFloatAttributes().withStringFromValueFunction ([] (auto x, auto) { return juce::String(x*100.0f)+" %";
+                                                            })  //lambda function parenthesis
+                                                             )  //parameter float parenthesis
 })
 #ifndef JucePlugin_PreferredChannelConfigurations
      : AudioProcessor (BusesProperties()
@@ -31,6 +38,7 @@ FreqAnalyzerInDualMixerAudioProcessor::FreqAnalyzerInDualMixerAudioProcessor()
     for (int i=0;i<2;i++)
     {
         mDWM[i].reset( new DWmixer<float> );
+        mDWM[i]->setid( (uint32_t) i );
     }
 }
 
@@ -197,13 +205,13 @@ bool FreqAnalyzerInDualMixerAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* FreqAnalyzerInDualMixerAudioProcessor::createEditor()
 {
-    return new FreqAnalyzerInDualMixerAudioProcessorEditor (*this);
+    return new FreqAnalyzerInDualMixerAudioProcessorEditor (*this, vtsParameters);
 }
 
 //==============================================================================
 void FreqAnalyzerInDualMixerAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    auto state = parameters.copyState();
+    auto state = vtsParameters.copyState();
     std::unique_ptr<juce::XmlElement> xml (state.createXml());
     copyXmlToBinary (*xml, destData);
     //DBG("SAVED STATE INFO IN" << "..." << "! ");
@@ -214,9 +222,9 @@ void FreqAnalyzerInDualMixerAudioProcessor::setStateInformation (const void* dat
     std::unique_ptr<juce::XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
      
     if (xmlState.get() != nullptr)
-        if (xmlState->hasTagName (parameters.state.getType()))
+        if (xmlState->hasTagName (vtsParameters.state.getType()))
         {
-            parameters.replaceState (juce::ValueTree::fromXml (*xmlState));
+            vtsParameters.replaceState (juce::ValueTree::fromXml (*xmlState));
             //DBG("GOT STATE INFO FROM " << "..." << "! ");
         }
 }

@@ -54,6 +54,9 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
     
+    //==============================================================================
+    std::unique_ptr< DWmixer<float> > mDWM[2];
+    
 private:
     //==============================================================================
     /// buffer size smps
@@ -61,9 +64,9 @@ private:
     /// sampling rate Hz
     float mSampleRate;
     /// vts parameters
-    juce::AudioProcessorValueTreeState parameters;
+    juce::AudioProcessorValueTreeState vtsParameters;
     //==============================================================================
-    std::unique_ptr< DWmixer<float> > mDWM[2];
+    
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (FreqAnalyzerInDualMixerAudioProcessor)
 };
