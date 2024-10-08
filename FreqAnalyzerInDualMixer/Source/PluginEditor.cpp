@@ -70,3 +70,4 @@ void FreqAnalyzerInDualMixerAudioProcessorEditor::sliderValueChanged(juce::Slide
         }
     }
 }
+

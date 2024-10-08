@@ -55,6 +55,7 @@ public:
     void setStateInformation (const void* data, int sizeInBytes) override;
     
     //==============================================================================
+    /// DWMix pointer
     std::unique_ptr< DWmixer<float> > mDWM[2];
     
 private:

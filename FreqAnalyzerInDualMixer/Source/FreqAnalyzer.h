@@ -17,6 +17,7 @@
 // all FFT-related objects in this header has fixed order: fftsize = 2048 (2e11)
 // fft :: 2^N sized fft -- 2^11 = 2048, ~23.4fps
 const uint32_t FFTORDER = 11;   // so far the FFTORDER is fixed at 11, may be subject to change later
+const float SR_DEFAULT = 48e3f; // default samplerate for generating display
 
 /// single data stream fft Unit (one signal channel)
 class fftUnit
@@ -26,16 +27,15 @@ public:
     {
         // initialize juce fft object
         fftOp.reset(new juce::dsp::FFT(FFTORDER));
-        sizeBuffer = (fftOp->getSize()) << 1;
+        sizeBuffer = (fftOp->getSize());
         // make two buffers the size of fft buffersize
         iBuffer.resize(sizeBuffer);
         oBuffer.resize(sizeBuffer);
         
         // nyquist size is half of total fftsize
         sizeNyquist = sizeBuffer >> 1;
-        
-        DBG("fftUnit buffer size is " + juce::String(sizeBuffer));
-        DBG("fftUnit Nyquist size is " + juce::String(sizeNyquist));
+        //DBG("fftUnit buffer size is " + juce::String(sizeBuffer));
+        //DBG("fftUnit Nyquist size is " + juce::String(sizeNyquist));
     }
     
     ~fftUnit()
@@ -96,6 +96,53 @@ private:
     
 };  // fftUnit class brackets
 
+/// Aux class for making a log2 x-axis of frequency, reversible conversion TBD
+class FreqScale4Display
+{
+public:
+    FreqScale4Display()
+    {
+        fSize = pow(2,FFTORDER-1);
+        freqAxis.resize(fSize);
+        remapFreq();
+    }
+    ~FreqScale4Display()
+    {
+    }
+    
+    void changeSR(float sr)
+    {
+        DBG("change of SR detected within the FreqScale static Object, remap freq now...");
+        sampleRate = sr;
+        remapFreq();
+    }
+    
+    // return the max value
+    float maxFreq() const   {return freqAxis[fSize-1];}
+    
+    // the thing itself
+    std::vector<float> freqAxis;
+    
+private:
+    float sampleRate = SR_DEFAULT;
+    int fSize;
+    
+    void remapFreq()
+    {
+        // prevent displaying current remapping values of X
+        //const juce::MessageManagerLock mmL2;
+        // ignore zero frequency
+        freqAxis[0] = 0.0f;
+        // create a raw axis and convert to log2
+        for (int i=1;i<fSize;i++)
+        {
+            freqAxis[i] = log2((float)i/fSize*sampleRate);
+        }
+    }
+};
+
+static FreqScale4Display fScale;
+
 /// Channel component - includes dry and wet
 class FreqAnalChannel : public juce::Component
 {
@@ -106,12 +153,16 @@ public:
         dryUnit.reset( new fftUnit );
         wetUnit.reset( new fftUnit );
         
-        graphXSize = dryUnit->getSizeNyquist()>>1;
+        graphXSize = dryUnit->getSizeNyquist();
+        
+        // should be whole fftSize
+        dBDry.resize(dryUnit->getSizeBuffer());
+        dBWet.resize(dryUnit->getSizeBuffer());
         
         // should be 1/2 fftSize
-        dBDry.resize(graphXSize);
-        dBWet.resize(graphXSize);
+        xCoords.resize(graphXSize);
         
+        // should be 1/2 fftSize - 1
         dryLines.resize(graphXSize-1);
         wetLines.resize(graphXSize-1);
         
@@ -151,8 +202,12 @@ public:
     
     void resized() override
     {
-        recalculateIncrements();
-        DBG("FAC " + juce::String((float)getWidth()) + " " + juce::String((float)getHeight()));
+        if (getHeight()!=0 && getWidth()!=0)
+        {
+            recalculateXcoords();
+            recalculateIncrements();
+            DBG("FAC " + juce::String((float)getWidth()) + " " + juce::String((float)getHeight()));
+        }
     }
     
     /// inherited from juce::component
@@ -161,23 +216,19 @@ public:
         const juce::MessageManagerLock mmLpaintnow;
         //DBG("mono channel paint called for channel: " + juce::String(chanid));
         
-        float xLast, xThis;
         float dLast, wLast, dThis, wThis;
         // void drawLine(float startX, float startY, float endX, float endY) const
         // void drawLine(float startX, float startY, float endX, float endY, float lineThickness) const
-        for (int i=1;i<graphXSize-1;i++)
+        for (int i=1;i<graphXSize;i++)
         {//skip zero frequency and nyquist frequency
             if (i==1)
             {
-                xThis = 0.0f;
                 dThis = dBDry[i]*yIncrement;
                 wThis = dBWet[i]*yIncrement;
             }else{
                 dLast = dThis;
                 wLast = wThis;
-                xLast = xThis;
                 
-                xThis = xLast+xIncrement;
                 dThis = dBDry[i]*yIncrement;
                 wThis = dBWet[i]*yIncrement;
                 
@@ -189,8 +240,8 @@ public:
                 */
                 
                 // set and draw new lines
-                dryLines[i-1].setStart(xLast,dLast);
-                dryLines[i-1].setEnd(xThis,dThis);
+                dryLines[i-1].setStart(xCoords[i-1],dLast);
+                dryLines[i-1].setEnd(xCoords[i],dThis);
                 if (chanid == 0)
                 {
                     g.setColour(juce::Colours::yellow);
@@ -203,8 +254,8 @@ public:
                 }
                 g.drawLine(dryLines[i-1]);
                 
-                wetLines[i-1].setStart(xLast,dLast);
-                wetLines[i-1].setEnd(xThis,wThis+dThis);
+                wetLines[i-1].setStart(xCoords[i-1],dLast);
+                wetLines[i-1].setEnd(xCoords[i],wThis+dThis);
                 if (chanid == 0)
                 {
                     g.setColour(juce::Colours::pink);
@@ -242,8 +293,8 @@ private:
     uint32_t chanid;
     
     // dimension related floats
-    float xIncrement;
     float yIncrement;
+    std::vector<float> xCoords;
     
     // lines
     std::vector<juce::Line<float>> dryLines;
@@ -260,9 +311,16 @@ private:
     /// called when channel component initialized or resized
     void recalculateIncrements()
     {
-        xIncrement = (float)getWidth()/graphXSize;
         yIncrement = (float)getHeight()/-192.0f;
-        DBG("FAC inc " + juce::String(xIncrement) + " " + juce::String(yIncrement));
+        DBG("FACh y inc = " + juce::String(yIncrement));
+    }
+    
+    void recalculateXcoords()
+    {
+        for (int i=0;i<fScale.freqAxis.size();i++)
+        {
+            xCoords[i] = (float)fScale.freqAxis[i]*(getWidth()-2.0f)/fScale.maxFreq() + 1.0f;
+        }
     }
     
 };  // FreqAnalChannel class brackets
@@ -284,6 +342,16 @@ public:
     {
     }
     
+    void setSR(float sr)//don't suppose this will be used any time soon, unless we are displaying rulers
+    {
+        if(sr==sampleRate)
+        {
+            // checkpoint preventing unnecessary remap
+            sampleRate = sr;
+            fScale.changeSR(sampleRate);
+        }
+    }
+    
     /// input a single sample to specified channel and dry/wet configuration
     void injectSampleToTo(float inputSample, uint32_t leftright, uint32_t drywet)
     {
@@ -301,7 +369,7 @@ public:
     {
         rectAreaL = juce::Rectangle<int>(0, 0, getWidth(), getHeight());
         rectAreaR = juce::Rectangle<int>(0, 0, getWidth(), getHeight());
-        DBG("FA: " + juce::String(getWidth()) + " " + juce::String(getHeight()));
+        DBG("FAer: " + juce::String(getWidth()) + " " + juce::String(getHeight()));
         LFAC.setBounds(rectAreaL);
         RFAC.setBounds(rectAreaR);
     }
@@ -324,5 +392,8 @@ private:
     juce::Rectangle<int> rectAreaL;
     juce::Rectangle<int> rectAreaR;
     
+    float sampleRate = SR_DEFAULT;
+    
 };  // FreqAnalyzer class brackets
+
 
