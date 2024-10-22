@@ -157,7 +157,8 @@ public:
         
         // should be whole fftSize
         dBDry.resize(dryUnit->getSizeBuffer());
-        dBWet.resize(dryUnit->getSizeBuffer());
+        dBWet.resize(wetUnit->getSizeBuffer());
+        DBG("dry wet resized to " + juce::String(dBDry.size()) + " " + juce::String(dBWet.size()));
         
         // should be 1/2 fftSize
         xCoords.resize(graphXSize);
@@ -172,7 +173,6 @@ public:
         dryUnit->iddbgLR = (int)chan;
         wetUnit->iddbgLR = (int)chan;
 #endif
-        recalculateIncrements();
     }
     ~FreqAnalChannel()
     {
@@ -191,8 +191,8 @@ public:
         
         if (dryUnit->ready && wetUnit->ready)
         {
-            spectrumGen();
             const juce::MessageManagerLock mmLrepaint;
+            spectrumGen();
             repaint();
             //DBG("both ready for this channel " + juce::String(chanid) + " , repaint called");
             dryUnit->ready = false;
@@ -213,14 +213,16 @@ public:
     /// inherited from juce::component
     void paint(juce::Graphics& g) override
     {
-        const juce::MessageManagerLock mmLpaintnow;
+        //const juce::MessageManagerLock mmLpaintnow;
+        
         //DBG("mono channel paint called for channel: " + juce::String(chanid));
         
         float dLast, wLast, dThis, wThis;
         // void drawLine(float startX, float startY, float endX, float endY) const
         // void drawLine(float startX, float startY, float endX, float endY, float lineThickness) const
         for (int i=1;i<graphXSize;i++)
-        {//skip zero frequency and nyquist frequency
+        {
+            //skip zero frequency and nyquist frequency
             if (i==1)
             {
                 dThis = dBDry[i]*yIncrement;
@@ -231,13 +233,6 @@ public:
                 
                 dThis = dBDry[i]*yIncrement;
                 wThis = dBWet[i]*yIncrement;
-                
-                // undraw previous lines (?)
-                /*
-                g.setColour(juce::Colours::white);
-                g.drawLine(dryLines[i-1]);
-                g.drawLine(wetLines[i-1]);
-                */
                 
                 // set and draw new lines
                 dryLines[i-1].setStart(xCoords[i-1],dLast);
@@ -302,9 +297,11 @@ private:
     
     void spectrumGen()
     {
-        dBDry = dryUnit->getBuffer();
+        std::vector<float> tmpsrc = dryUnit->getBuffer();
+        std::copy(tmpsrc.begin(),tmpsrc.end(),dBDry.begin());
         SpectrumUtil::amp2db(dBDry);
-        dBWet = wetUnit->getBuffer();
+        tmpsrc = wetUnit->getBuffer();
+        std::copy(tmpsrc.begin(),tmpsrc.end(),dBWet.begin());
         SpectrumUtil::amp2db(dBWet);
     }
     
