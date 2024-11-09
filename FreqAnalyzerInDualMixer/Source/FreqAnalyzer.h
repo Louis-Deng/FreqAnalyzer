@@ -133,11 +133,12 @@ private:
         //const juce::MessageManagerLock mmL2;
         // ignore zero frequency
         freqAxis[0] = 0.0f;
-        // create a raw axis and convert to log2
-        for (int i=1;i<fSize;i++)
+        // create a raw axis and convert to log10
+        for (int bin=1;bin<fSize;bin++)
         {
-            freqAxis[i] = log2((float)i/fSize*sampleRate);
+            freqAxis[bin] = log10((float)bin)/log10(fSize);
         }
+        // this gives a vector between 0~1 in freqAxis vector, we should multiply later by the width of the graph window
     }
 };
 
@@ -205,7 +206,7 @@ public:
         if (getHeight()!=0 && getWidth()!=0)
         {
             recalculateXcoords();
-            recalculateIncrements();
+            recalculateYIncrements();
             DBG("FAC " + juce::String((float)getWidth()) + " " + juce::String((float)getHeight()));
         }
     }
@@ -225,14 +226,14 @@ public:
             //skip zero frequency and nyquist frequency
             if (i==1)
             {
-                dThis = dBDry[i]*yIncrement;
-                wThis = dBWet[i]*yIncrement;
+                dThis = dBDry[i]*yIncrement + 1.0f;
+                wThis = dBWet[i]*yIncrement + 1.0f;
             }else{
                 dLast = dThis;
                 wLast = wThis;
                 
-                dThis = dBDry[i]*yIncrement;
-                wThis = dBWet[i]*yIncrement;
+                dThis = dBDry[i]*yIncrement + 1.0f;
+                wThis = dBWet[i]*yIncrement + 1.0f;
                 
                 // set and draw new lines
                 dryLines[i-1].setStart(xCoords[i-1],dLast);
@@ -306,17 +307,19 @@ private:
     }
     
     /// called when channel component initialized or resized
-    void recalculateIncrements()
+    void recalculateYIncrements()
     {
-        yIncrement = (float)getHeight()/-192.0f;
+        yIncrement = (float)(getHeight()-2.0f)/-192.0f;
         DBG("FACh y inc = " + juce::String(yIncrement));
     }
     
     void recalculateXcoords()
     {
-        for (int i=0;i<fScale.freqAxis.size();i++)
+        for (int bin=0;bin<fScale.freqAxis.size();bin++)
         {
-            xCoords[i] = (float)fScale.freqAxis[i]*(getWidth()-2.0f)/fScale.maxFreq() + 1.0f;
+            // should ignore bin=0
+            // leave 1 pixel on L/R ends
+            xCoords[bin] = fScale.freqAxis[bin]*(getWidth()-2.0f) + 1.0f;
         }
     }
     
