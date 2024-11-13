@@ -162,12 +162,12 @@ public:
         dBWet.resize(wetUnit->getSizeBuffer());
         DBG("dry wet resized to " + juce::String(dBDry.size()) + " " + juce::String(dBWet.size()));
         
-        // should be 1/2 fftSize
+        // coordinate series size defined here
         xCoords.resize(graphXSize);
         
-        // should be 1/2 fftSize - 1
-        dryLines.resize(graphXSize-1);
-        wetLines.resize(graphXSize-1);
+        // should be gapped-bin-size - 1
+        dryLines.resize(xGaps.size()-1);
+        wetLines.resize(xGaps.size()-1);
         
 #ifdef DEBUG
         dryUnit->iddbgDW = 0;
@@ -207,7 +207,7 @@ public:
     {
         if (getHeight()!=0 && getWidth()!=0)
         {
-            recalculateXcoords();
+            recalculateXcoords();   //should come after initiate xGaps
             recalculateYIncrements();
             DBG("FAC " + juce::String((float)getWidth()) + " " + juce::String((float)getHeight()));
         }
@@ -225,22 +225,24 @@ public:
         // void drawLine(float startX, float startY, float endX, float endY, float lineThickness) const
         for (int x=0;x<xGaps.size();x++)
         {
-            int i = xGaps[x];
-            //skip zero frequency and nyquist frequency
-            if (i==0)
+            if (x==0)
             {
-                dThis = dBDry[i]*yIncrement + 1.0f;
-                wThis = dBWet[i]*yIncrement + 1.0f;
+                dThis = dBDry[xGaps[0]]*yIncrement + 1.0f;
+                wThis = dBWet[xGaps[0]]*yIncrement + 1.0f;
             }else{
+                
+                int iThis = xGaps[x];
+                int iLast = xGaps[x-1];
+                
                 dLast = dThis;
                 wLast = wThis;
                 
-                dThis = dBDry[i]*yIncrement + 1.0f;
-                wThis = dBWet[i]*yIncrement + 1.0f;
+                dThis = dBDry[iThis]*yIncrement + 1.0f;
+                wThis = dBWet[iThis]*yIncrement + 1.0f;
                 
                 // set and draw new lines
-                dryLines[i-1].setStart(xCoords[i-1],dLast);
-                dryLines[i-1].setEnd(xCoords[i],dThis);
+                dryLines[x-1].setStart(xCoords[iLast],dLast);
+                dryLines[x-1].setEnd(xCoords[iThis],dThis);
                 if (chanid == 0)
                 {
                     g.setColour(juce::Colours::yellow);
@@ -251,10 +253,10 @@ public:
                     g.setColour(juce::Colours::orange);
                     g.setOpacity(0.5);
                 }
-                g.drawLine(dryLines[i-1]);
+                g.drawLine(dryLines[x-1]);
                 
-                wetLines[i-1].setStart(xCoords[i-1],wLast);
-                wetLines[i-1].setEnd(xCoords[i],wThis+dThis);
+                wetLines[x-1].setStart(xCoords[iLast],wLast);
+                wetLines[x-1].setEnd(xCoords[iThis],wThis+dThis);
                 if (chanid == 0)
                 {
                     g.setColour(juce::Colours::pink);
@@ -265,7 +267,7 @@ public:
                     g.setColour(juce::Colours::purple);
                     g.setOpacity(0.5);
                 }
-                g.drawLine(wetLines[i-1]);
+                g.drawLine(wetLines[x-1]);
                 
             }
         }
