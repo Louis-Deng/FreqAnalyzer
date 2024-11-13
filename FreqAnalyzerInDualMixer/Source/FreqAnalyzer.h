@@ -155,6 +155,7 @@ public:
         wetUnit.reset( new fftUnit );
         
         graphXSize = dryUnit->getSizeNyquist();
+        initializeXGaps(graphXSize);
         
         // should be whole fftSize
         dBDry.resize(dryUnit->getSizeBuffer());
@@ -174,6 +175,7 @@ public:
         dryUnit->iddbgLR = (int)chan;
         wetUnit->iddbgLR = (int)chan;
 #endif
+        
     }
     ~FreqAnalChannel()
     {
@@ -221,10 +223,11 @@ public:
         float dLast, wLast, dThis, wThis;
         // void drawLine(float startX, float startY, float endX, float endY) const
         // void drawLine(float startX, float startY, float endX, float endY, float lineThickness) const
-        for (int i=1;i<graphXSize;i++)
+        for (int x=0;x<xGaps.size();x++)
         {
+            int i = xGaps[x];
             //skip zero frequency and nyquist frequency
-            if (i==1)
+            if (i==0)
             {
                 dThis = dBDry[i]*yIncrement + 1.0f;
                 wThis = dBWet[i]*yIncrement + 1.0f;
@@ -250,7 +253,7 @@ public:
                 }
                 g.drawLine(dryLines[i-1]);
                 
-                wetLines[i-1].setStart(xCoords[i-1],dLast);
+                wetLines[i-1].setStart(xCoords[i-1],wLast);
                 wetLines[i-1].setEnd(xCoords[i],wThis+dThis);
                 if (chanid == 0)
                 {
@@ -288,6 +291,9 @@ private:
     // chan-id
     uint32_t chanid;
     
+    // iteration scaling
+    std::vector<int> xGaps;
+    
     // dimension related floats
     float yIncrement;
     std::vector<float> xCoords;
@@ -306,10 +312,30 @@ private:
         SpectrumUtil::amp2db(dBWet);
     }
     
+    /// called when channel initialized, incrementally omit higher frequency bins
+    void initializeXGaps(int xTotal)
+    {
+        int iterX = 1;  // ignore zero frequency =/=0
+        int gap = 1;
+        int indexGap = 0;
+        while (iterX < xTotal)  // ignore nyquist frequency </=
+        {
+            
+            xGaps.push_back(iterX);
+            iterX += gap;
+            
+            indexGap+=1;
+            
+            if (!(indexGap%32))
+                gap*=2; // double the gap every 32 bin selections
+        }
+        DBG("xGap series size = " + juce::String(xGaps.size()));
+    }
+    
     /// called when channel component initialized or resized
     void recalculateYIncrements()
     {
-        yIncrement = (float)(getHeight()-2.0f)/-192.0f;
+        yIncrement = (float)(getHeight()-2.0f)/-96.0f;
         DBG("FACh y inc = " + juce::String(yIncrement));
     }
     

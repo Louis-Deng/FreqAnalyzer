@@ -15,7 +15,7 @@ namespace SpectrumUtil
 inline float amp2db(float amp)
 {
     float dbNegative = 20.0f*log10( abs(amp) );
-    if (dbNegative < -192.0f) {dbNegative = -192.0f;}
+    if (dbNegative < -96.0f) {dbNegative = -96.0f;}
     
     return dbNegative;  // expected to return -inf when amp=0.0f
 }
