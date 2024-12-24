@@ -28,11 +28,11 @@ public:
     {
     }
     
-    void communicateFreqAnalyzerPtrs(std::shared_ptr<FreqAnalyzer> freqAnalyzerPtr)
+    void communicateFreqAnalyzerPtr(std::shared_ptr<FreqAnalyzer> freqAnalyzerPtr)
     {
-        faPtr = freqAnalyzerPtr;
+        faPtrW = freqAnalyzerPtr;
     }
-        
+    
     /// process buffered input (R+W Permission for wet, R Permission for dry): apply sample-wise tick calculation, and replace buffer with output.
     void processBuffer(const float *dryBufferRead, float *wetBufferWrite, int numSamps)
     {
@@ -63,6 +63,7 @@ private:
     uint32_t thisChanid;
     
     // shared ptr storage
+    std::weak_ptr<FreqAnalyzer> faPtrW;
     std::shared_ptr<FreqAnalyzer> faPtr;
     
     SignalType mix(SignalType dryInput, SignalType wetInput)
@@ -70,7 +71,7 @@ private:
         SignalType dryPPT = (1.0-proportion)*(double)dryInput;
         SignalType wetPPT = proportion*(double)wetInput;
         //embed freq analyzer, inject dry and wet of this channel
-        if (faPtr!=nullptr)
+        if ((faPtr=faPtrW.lock()) != nullptr)   // here try to access the shared pointer
         {
             faPtr->injectSampleToTo(dryPPT,thisChanid,0);
             faPtr->injectSampleToTo(wetPPT,thisChanid,1);

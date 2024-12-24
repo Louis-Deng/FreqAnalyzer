@@ -11,11 +11,11 @@ Author:  Louis Deng
 #pragma once
 namespace SpectrumUtil
 {
-
+inline float FLOOR = -192.0f;
 inline float amp2db(float amp)
 {
-    float dbNegative = 20.0f*log10( abs(amp) );
-    if (dbNegative < -96.0f) {dbNegative = -96.0f;}
+    float dbNegative = 10.0f*log10( abs(amp) );
+    if (dbNegative < FLOOR) {dbNegative = FLOOR;}
     
     return dbNegative;  // expected to return -inf when amp=0.0f
 }
@@ -24,8 +24,8 @@ inline void amp2db(std::vector<float>& input)
 {
     for (int i=0;i<size(input);i++)
     {
-        if (abs(input[i]) < 1e-32) {input[i] = -192.0f;}
-        else {input[i] = 20.0f*log10( abs(input[i]) );}
+        if (pow(input[i],2.0f) < 1e-16) {input[i] = FLOOR;}
+        else {input[i] = 20.0f*log10( pow(input[i],2.0f) );}
     }
 }
 

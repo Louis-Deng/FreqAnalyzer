@@ -9,7 +9,7 @@
 namespace BinaryData
 {
     extern const char*   Notes_txt;
-    const int            Notes_txtSize = 0;
+    const int            Notes_txtSize = 793;
 
     // Number of elements in the namedResourceList and originalFileNames arrays.
     const int namedResourceListSize = 1;

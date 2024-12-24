@@ -40,6 +40,9 @@ private:
     juce::AudioProcessorValueTreeState& valueTreeState;
     
     // custom added objects
+    /* when re-init UI, this needs to concur with already existing freq analyzer
+     initialize the pointer here helps save processing power when UI is not opened
+     */
     std::shared_ptr<FreqAnalyzer> freqAnalyzerPtr;
     
     juce::Slider mDWMixKnob;

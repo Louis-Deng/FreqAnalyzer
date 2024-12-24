@@ -33,11 +33,11 @@ FreqAnalyzerInDualMixerAudioProcessorEditor::FreqAnalyzerInDualMixerAudioProcess
     
     freqAnalyzerPtr.reset( new FreqAnalyzer );
     for(int i=0; i<2; i++){
-        audioProcessor.mDWM[i]->communicateFreqAnalyzerPtrs(freqAnalyzerPtr);
+        audioProcessor.mDWM[i]->communicateFreqAnalyzerPtr(freqAnalyzerPtr);
     }
     addAndMakeVisible(*freqAnalyzerPtr);
     freqAnalyzerPtr->setBounds(15, 295, 630, 270);
-   
+    
 }
 
 FreqAnalyzerInDualMixerAudioProcessorEditor::~FreqAnalyzerInDualMixerAudioProcessorEditor()

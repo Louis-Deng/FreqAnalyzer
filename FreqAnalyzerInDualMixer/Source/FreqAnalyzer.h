@@ -16,7 +16,15 @@
 #include "SpectrumUtil.h"
 // all FFT-related objects in this header has fixed order: fftsize = 2048 (2e11)
 // fft :: 2^N sized fft -- 2^11 = 2048, ~23.4fps
-const uint32_t FFTORDER = 11;   // so far the FFTORDER is fixed at 11, may be subject to change later
+// with 50% zero padding -- 2^10 = 1024, ~ 46.9fps
+// to maintain the same framerate (~23.4fps) i.e. update every 2048 samples
+// -> we can use 50% overlap FFTN = 4096    -> copy i=2048~4095(end) to new buffer i=0~2047
+// or we can use 75% overlap FFTN = 8192    -> copy i=2048~8191(end) to new buffer i=0~6043
+
+// so far the FFTORDER_A is fixed at 11, may be subject to change later
+// code is written as such that sample injection is always capped at 2048, fft calculation is always per 1024 samples
+const uint32_t FFTORDER_A = 11;   // active FFT_ORDER (what is updated every frame) == 11
+static uint32_t FFTORDER_T = 11; // total length of FFT in 2^Order (11,12,13)
 const float SR_DEFAULT = 48e3f; // default samplerate for generating display
 
 /// single data stream fft Unit (one signal channel)
@@ -26,41 +34,56 @@ public:
     fftUnit()
     {
         // initialize juce fft object
-        fftOp.reset(new juce::dsp::FFT(FFTORDER));
+        fftOp.reset(new juce::dsp::FFT(FFTORDER_T));
         sizeBuffer = (fftOp->getSize());
         // make two buffers the size of fft buffersize
         iBuffer.resize(sizeBuffer);
         oBuffer.resize(sizeBuffer);
         
-        // nyquist size is half of total fftsize
-        sizeNyquist = sizeBuffer >> 1;
-        //DBG("fftUnit buffer size is " + juce::String(sizeBuffer));
-        //DBG("fftUnit Nyquist size is " + juce::String(sizeNyquist));
+        // Zeropad size is half of total fftsize
+        sizeZeropad = sizeBuffer >> 1;
+        // active size is (1-overlap)% of sizeZeropad (100,50,25 %)
+        sizeActive = sizeZeropad >> MAGDIFF;
+        
+#ifdef DEBUG
+        DBG("fftUnit buffer size is " + juce::String(sizeBuffer));
+        DBG("fftUnit Zeropad size is " + juce::String(sizeZeropad));
+        DBG("fftUnit Overlap is " + juce::String((1.0f-1.0f/pow(2.0f,MAGDIFF))*100.0f) + "%");
+        DBG("fftUnit Active size is " + juce::String(sizeActive));
+#endif
     }
     
     ~fftUnit()
     {
     }
-    
-    /// inject a single sample to this fft unit, returns if this unit is ready to show its complete spectrum
+        
+    /// inject a single sample to this fft unit, turn 'ready' to true if this unit is ready to show its complete spectrum
     void injectSample (float input)
     {
-        iBuffer[iterBuffer] = input;
-        iterBuffer++;
+        iBuffer[iterZeropadCounter] = input;
+        iterZeropadCounter++;
+        iterActiveCounter++;
         
-        if ( !(iterBuffer<sizeNyquist) )
+        if ( !(iterActiveCounter<sizeActive) )
         {
-            // reset buffer iterator
-            iterBuffer = 0;
-            // copy i to o
+            // reset active fft counter - overlap dependent
+            iterActiveCounter = 0;
+            // copy i to o ###NEED UPDATE TO REFLECT CORRECT TIME SERIES
             oBuffer = iBuffer;
             // calculate o
+            // EVERY 1024
             fftOp->performFrequencyOnlyForwardTransform(&(oBuffer[0]));
             if (!ready) ready = true;
 #ifdef DEBUG
             else DBG("queue stalled for fftUnit D/W: " + juce::String(iddbgDW) + " L/R: " + juce::String(iddbgLR));
 #endif
-            //DBG("injectSample hit top");
+        }
+        
+        if ( !(iterZeropadCounter<sizeZeropad) )
+        {
+            // reset Zeropad fft iterator - zero-padding dependent
+            // EVERY 2048
+            iterZeropadCounter = 0;
         }
     }
     
@@ -68,9 +91,6 @@ public:
     
     /// get size of buffer
     uint32_t getSizeBuffer() const { return sizeBuffer; }
-    
-    /// get size of useful info buffer (should be half of size of buffer)
-    uint32_t getSizeNyquist() const { return sizeNyquist; }
     
     bool ready = false;
     
@@ -81,28 +101,32 @@ public:
 #endif
     
 private:
+    /// Overlap related
+    uint32_t MAGDIFF = FFTORDER_T-FFTORDER_A;
     /// I/O Buffer
     std::vector<float> iBuffer;
     std::vector<float> oBuffer;
     
     /// iteration related parameter
-    uint32_t iterBuffer = 0;
+    uint32_t iterZeropadCounter = 0;
+    uint32_t iterActiveCounter = 0;
     
     uint32_t sizeBuffer;
-    uint32_t sizeNyquist;
+    uint32_t sizeZeropad;
+    uint32_t sizeActive;
     
     /// base unit
     std::unique_ptr<juce::dsp::FFT> fftOp;
     
 };  // fftUnit class brackets
 
-/// Aux class for making a log2 x-axis of frequency, reversible conversion TBD
+/// Aux class for making a log2 x-axis of frequency
 class FreqScale4Display
 {
 public:
     FreqScale4Display()
     {
-        fSize = pow(2,FFTORDER-1);
+        fSize = pow(2,FFTORDER_T-1);
         freqAxis.resize(fSize);
         remapFreq();
     }
@@ -154,12 +178,13 @@ public:
         dryUnit.reset( new fftUnit );
         wetUnit.reset( new fftUnit );
         
-        graphXSize = dryUnit->getSizeNyquist();
+        graphXSize = dryUnit->getSizeBuffer()/2;
         initializeXGaps(graphXSize);
         
         // should be whole fftSize
         dBDry.resize(dryUnit->getSizeBuffer());
         dBWet.resize(wetUnit->getSizeBuffer());
+        
         DBG("dry wet resized to " + juce::String(dBDry.size()) + " " + juce::String(dBWet.size()));
         
         // coordinate series size defined here
@@ -227,8 +252,8 @@ public:
         {
             if (x==0)
             {
-                dThis = dBDry[xGaps[0]]*yIncrement + 1.0f;
-                wThis = dBWet[xGaps[0]]*yIncrement + 1.0f;
+                dThis = dBDry[xGaps[0]]*yIncrement;
+                wThis = dBWet[xGaps[0]]*yIncrement;
             }else{
                 
                 int iThis = xGaps[x];
@@ -237,12 +262,12 @@ public:
                 dLast = dThis;
                 wLast = wThis;
                 
-                dThis = dBDry[iThis]*yIncrement + 1.0f;
-                wThis = dBWet[iThis]*yIncrement + 1.0f;
+                dThis = dBDry[iThis]*yIncrement;
+                wThis = dBWet[iThis]*yIncrement;
                 
                 // set and draw new lines
-                dryLines[x-1].setStart(xCoords[iLast],dLast);
-                dryLines[x-1].setEnd(xCoords[iThis],dThis);
+                dryLines[x-1].setStart(xCoords[iLast],dLast+1.0f);
+                dryLines[x-1].setEnd(xCoords[iThis],dThis+1.0f);
                 if (chanid == 0)
                 {
                     g.setColour(juce::Colours::yellow);
@@ -255,8 +280,8 @@ public:
                 }
                 g.drawLine(dryLines[x-1]);
                 
-                wetLines[x-1].setStart(xCoords[iLast],wLast);
-                wetLines[x-1].setEnd(xCoords[iThis],wThis+dThis);
+                wetLines[x-1].setStart(xCoords[iLast],dLast+wLast+1.0f);
+                wetLines[x-1].setEnd(xCoords[iThis],dThis+wThis+1.0f);
                 if (chanid == 0)
                 {
                     g.setColour(juce::Colours::pink);
@@ -285,8 +310,8 @@ private:
     // ready to show content
     bool dryReady;
     bool wetReady;
-    
-    // SPL in dB lines
+        
+    // buffers storing SPL in dB
     std::vector<float> dBDry;
     std::vector<float> dBWet;
     
@@ -306,11 +331,10 @@ private:
     
     void spectrumGen()
     {
-        std::vector<float> tmpsrc = dryUnit->getBuffer();
-        std::copy(tmpsrc.begin(),tmpsrc.end(),dBDry.begin());
+        dBDry = dryUnit->getBuffer();
+        dBWet = wetUnit->getBuffer();
+        
         SpectrumUtil::amp2db(dBDry);
-        tmpsrc = wetUnit->getBuffer();
-        std::copy(tmpsrc.begin(),tmpsrc.end(),dBWet.begin());
         SpectrumUtil::amp2db(dBWet);
     }
     
@@ -320,7 +344,7 @@ private:
         int iterX = 1;  // ignore zero frequency =/=0
         int gap = 1;
         int indexGap = 0;
-        while (iterX < xTotal)  // ignore nyquist frequency </=
+        while (iterX < xTotal)  // ignore Nyquist frequency </=
         {
             
             xGaps.push_back(iterX);
@@ -337,7 +361,7 @@ private:
     /// called when channel component initialized or resized
     void recalculateYIncrements()
     {
-        yIncrement = (float)(getHeight()-2.0f)/-96.0f;
+        yIncrement = (float)(getHeight()-2.0f)/SpectrumUtil::FLOOR;
         DBG("FACh y inc = " + juce::String(yIncrement));
     }
     
@@ -404,6 +428,8 @@ public:
         
     void paint(juce::Graphics& g) override
     {
+        const juce::MessageManagerLock mmLpaintBordernow;
+        
         g.setColour(juce::Colours::white);
         g.drawRect(rectAreaL);
         g.drawRect(rectAreaR);
