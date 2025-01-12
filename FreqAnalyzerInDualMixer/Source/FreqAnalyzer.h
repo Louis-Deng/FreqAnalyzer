@@ -40,16 +40,16 @@ public:
         iBuffer.resize(sizeBuffer);
         oBuffer.resize(sizeBuffer);
         
-        // Zeropad size is half of total fftsize
-        sizeZeropad = sizeBuffer >> 1;
-        // active size is (1-overlap)% of sizeZeropad (100,50,25 %)
-        sizeActive = sizeZeropad >> MAGDIFF;
+        // Nyquist size is half of total fftsize
+        sizeNyquist = sizeBuffer >> 1;
+        // active size is (1-overlap)% of sizeNyquist (100,50,25 %)
+        sizeStream = sizeNyquist >> MAGDIFF;
         
 #ifdef DEBUG
         DBG("fftUnit buffer size is " + juce::String(sizeBuffer));
-        DBG("fftUnit Zeropad size is " + juce::String(sizeZeropad));
+        DBG("fftUnit Nyquist size is " + juce::String(sizeNyquist));
         DBG("fftUnit Overlap is " + juce::String((1.0f-1.0f/pow(2.0f,MAGDIFF))*100.0f) + "%");
-        DBG("fftUnit Active size is " + juce::String(sizeActive));
+        DBG("fftUnit Active Stream size is " + juce::String(sizeStream));
 #endif
     }
     
@@ -60,16 +60,16 @@ public:
     /// inject a single sample to this fft unit, turn 'ready' to true if this unit is ready to show its complete spectrum
     void injectSample (float input)
     {
-        iBuffer[iterZeropadCounter] = input;
-        iterZeropadCounter++;
+        iBuffer[iterNyquistCounter] = input;
+        iterNyquistCounter++;
         iterActiveCounter++;
         
-        if ( !(iterActiveCounter<sizeActive) )
+        if ( !(iterActiveCounter<sizeStream) )
         {
             // reset active fft counter - overlap dependent
             iterActiveCounter = 0;
             // copy i to o ###NEED UPDATE TO REFLECT CORRECT TIME SERIES
-            oBuffer = iBuffer;
+            std::copy(iBuffer.begin(),iBuffer.end(),oBuffer.begin());
             // calculate o
             // EVERY 1024
             fftOp->performFrequencyOnlyForwardTransform(&(oBuffer[0]));
@@ -79,11 +79,11 @@ public:
 #endif
         }
         
-        if ( !(iterZeropadCounter<sizeZeropad) )
+        if ( !(iterNyquistCounter<sizeNyquist) )
         {
-            // reset Zeropad fft iterator - zero-padding dependent
+            // reset Nyquist fft iterator - zero-padding dependent
             // EVERY 2048
-            iterZeropadCounter = 0;
+            iterNyquistCounter = 0;
         }
     }
     
@@ -91,6 +91,8 @@ public:
     
     /// get size of buffer
     uint32_t getSizeBuffer() const { return sizeBuffer; }
+    
+    uint32_t getSizeNyquist() const { return sizeNyquist; }
     
     bool ready = false;
     
@@ -108,12 +110,12 @@ private:
     std::vector<float> oBuffer;
     
     /// iteration related parameter
-    uint32_t iterZeropadCounter = 0;
+    uint32_t iterNyquistCounter = 0;
     uint32_t iterActiveCounter = 0;
     
     uint32_t sizeBuffer;
-    uint32_t sizeZeropad;
-    uint32_t sizeActive;
+    uint32_t sizeNyquist;
+    uint32_t sizeStream;
     
     /// base unit
     std::unique_ptr<juce::dsp::FFT> fftOp;
@@ -153,8 +155,6 @@ private:
     
     void remapFreq()
     {
-        // prevent displaying current remapping values of X
-        //const juce::MessageManagerLock mmL2;
         // ignore zero frequency
         freqAxis[0] = 0.0f;
         // create a raw axis and convert to log10
@@ -178,7 +178,7 @@ public:
         dryUnit.reset( new fftUnit );
         wetUnit.reset( new fftUnit );
         
-        graphXSize = dryUnit->getSizeBuffer()/2;
+        graphXSize = dryUnit->getSizeNyquist();
         initializeXGaps(graphXSize);
         
         // should be whole fftSize
@@ -222,9 +222,6 @@ public:
             const juce::MessageManagerLock mmLrepaint;
             spectrumGen();
             repaint();
-            //DBG("both ready for this channel " + juce::String(chanid) + " , repaint called");
-            dryUnit->ready = false;
-            wetUnit->ready = false;
         }
     }
     
@@ -295,8 +292,7 @@ public:
                 g.drawLine(wetLines[x-1]);
                 
             }
-        }
-        
+        } // for loop brackets
     }
     
 private:
@@ -306,10 +302,6 @@ private:
     // dry and wet fft units
     std::unique_ptr<fftUnit> dryUnit;
     std::unique_ptr<fftUnit> wetUnit;
-    
-    // ready to show content
-    bool dryReady;
-    bool wetReady;
         
     // buffers storing SPL in dB
     std::vector<float> dBDry;
@@ -331,11 +323,17 @@ private:
     
     void spectrumGen()
     {
+        const juce::MessageManagerLock mmLspectrumGennow;
+        
         dBDry = dryUnit->getBuffer();
         dBWet = wetUnit->getBuffer();
         
         SpectrumUtil::amp2db(dBDry);
         SpectrumUtil::amp2db(dBWet);
+        
+        // un-ready the units
+        dryUnit->ready = false;
+        wetUnit->ready = false;
     }
     
     /// called when channel initialized, incrementally omit higher frequency bins
